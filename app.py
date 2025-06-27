@@ -3,7 +3,7 @@
 app.py – Générateur CPN  (DFRXHYBCPNA / AFRXHYBCPNA)
 • Déposez :
     1. Un fichier principal (Réf. interne + Réf. client).
-    2. Une liste clients (une seule colonne).
+    2. Un périmètre (comptes client concernés) – une seule colonne.
 • Choisissez les colonnes au moyen de menus déroulants (1 = première colonne …).
 • Génère :
     – DFRXHYBCPNAyyMMdd0000  (TSV, sans en-tête)
@@ -13,8 +13,7 @@ app.py – Générateur CPN  (DFRXHYBCPNA / AFRXHYBCPNA)
 from __future__ import annotations
 from datetime import datetime
 from itertools import product
-from io import BytesIO, StringIO
-import io
+from io import StringIO
 
 import pandas as pd
 import streamlit as st
@@ -80,7 +79,7 @@ with colA:
     main_file = st.file_uploader("Drag-&-drop", type=("csv", "xlsx", "xls"), key="main")
 
 with colB:
-    st.markdown("### 📂 Liste clients")
+    st.markdown("### 📂 Périmètre (comptes client concernés)")
     cli_file = st.file_uploader("Drag-&-drop", type=("csv", "xlsx", "xls"), key="cli")
 
 if main_file:
