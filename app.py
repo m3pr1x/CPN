@@ -2,18 +2,23 @@
 """
 app.py – Générateur CPN  (DFRXHYBCPNA / AFRXHYBCPNA)
 • Déposez :
-    1. Un fichier principal (Réf. interne + Réf. client).
+    1. Un fichier appairage client (Réf. interne + Réf. client).
     2. Un périmètre (comptes client concernés) – une seule colonne.
 • Choisissez les colonnes au moyen de menus déroulants (1 = première colonne …).
 • Génère :
     – DFRXHYBCPNAyyMMdd0000  (TSV, sans en-tête)
     – AFRXHYBCPNAyyMMdd0000  (acknowledgement TXT)
+
+Sanity‑check ajouté :
+    • La colonne « Réf. interne » doit contenir **exclusivement** 8 chiffres (string).
+    • Les lignes non conformes sont listées et l'exécution s'arrête.
 """
 
 from __future__ import annotations
 from datetime import datetime
 from itertools import product
 from io import StringIO
+import re
 
 import pandas as pd
 import streamlit as st
@@ -23,6 +28,7 @@ st.set_page_config(page_title="CPN", page_icon="📑", layout="wide")
 st.title("📑 Générateur CPN (DFRXHYBCPNA / AFRXHYBCPNA)")
 
 # ───────────────────────── UTILS ─────────────────────────
+
 def read_any(file):
     name = file.name.lower()
     if name.endswith(".csv"):
@@ -39,6 +45,10 @@ def to_tsv_bytes(df: pd.DataFrame) -> bytes:
     buf = StringIO()
     df.to_csv(buf, sep="\t", index=False, header=False)
     return buf.getvalue().encode("utf-8")
+
+def validate_internal_codes(series: pd.Series) -> pd.Series:
+    """Retourne un masque booléen True si la valeur est invalide (≠ 8 chiffres)."""
+    return ~series.str.fullmatch(r"\d{8}")
 
 def cpn_logic(df_principal: pd.DataFrame, col_cli: int, col_int: int,
               series_cli: pd.Series):
@@ -75,7 +85,7 @@ def cpn_logic(df_principal: pd.DataFrame, col_cli: int, col_int: int,
 colA, colB = st.columns(2)
 
 with colA:
-    st.markdown("### 📂 Fichier principal")
+    st.markdown("### 📂 Fichier appairage client")  # libellé renommé
     main_file = st.file_uploader("Drag-&-drop", type=("csv", "xlsx", "xls"), key="main")
 
 with colB:
@@ -97,6 +107,21 @@ if st.button("🚀 Générer CPN", disabled=not (main_file and cli_file and col_
     try:
         df_main = read_any(main_file)
         df_cli  = read_any(cli_file)
+
+        # ------- Sanity‑check Réf. interne -------
+        series_int = df_main.iloc[:, col_int - 1].astype(str).str.strip()
+        invalid_mask = validate_internal_codes(series_int)
+        if invalid_mask.any():
+            st.error(f"❌ {invalid_mask.sum()} Réf. interne invalide(s) (doivent contenir exactement 8 chiffres).")
+            st.dataframe(
+                pd.DataFrame({
+                    "Ligne": series_int.index[invalid_mask] + 1,
+                    "Réf. interne": series_int[invalid_mask]
+                }),
+                use_container_width=True
+            )
+            st.stop()
+
         series_cli = df_cli.iloc[:, 0]            # 1ʳᵉ colonne de la liste clients
 
         pf, dfrx_name, afrx_name, afrx_txt = cpn_logic(
